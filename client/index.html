@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <!-- Template Design by Templates Perfect | http://www.TemplatesPerfect.com -->
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+        <title>Tequila worms - Yahoo! Open Hack Romania 2011!</title>
+        <link href="style.css" rel="stylesheet" type="text/css" />
+        <script type="text/javascript" src="jquery.js"></script>
+        <script type="text/javascript" src="http://192.168.1.3:8090/socket.io/socket.io.js"></script>
+        <script type="text/javascript" src="worms.js"></script>
+    </head>
+
+    <body>
+
+        <div id="header">
+
+            <div id="navbar">
+
+            </div>
+            <div id="logo"><h1><a href="#">
+				Tequila Worms</a></h1>
+                <p>
+                    The worm final countdown has began!!!
+                </p></div>
+
+        </div>
+        <div id="container">
+
+            <div id="sidebar">
+                <input id="inputName" />
+                <button onclick="return testStart();">start</button>
+
+                <div id="competitors"></div>
+                <div id="log" style="padding-top: 10px;">
+
+                </div>
+            </div>
+            <div id="content">
+                <!--
+                <h1>Worm armageddon has begun</h1>
+                -->
+                <p>
+                    <canvas id="canvasContainer" style="border: 1px solid #000;" width="560" height="420"></canvas>
+                </p>
+                <p>
+                    Keys: <b>W</b> - UP | <b>S</b> - DOWN | <b>A</b> - LEFT | <b>D</b> - RIGHT
+                </p>
+
+            </div>
+        </div>			
+        <div id="footer">Tequila Worms - Yahoo! Open Hack Romania 2011</div>
+
+        <script>
+            $(document).ready(function () {
+                
+                Game = (function () {
+                    var maxX;
+                    var maxY;
+                    
+                    var elementRatius;
+                    
+                    var elementWidth;
+                    
+                    var canvasElement = document.getElementById('canvasContainer');
+                    
+                    var canvasCtx = canvasElement.getContext('2d');
+                    
+                    var canvasWidth = canvasElement.width;
+                    var canvasHeight = canvasElement.height;
+                    
+                    var elementWidth;
+                    var elementHeight;
+                    
+                    var current;
+                    
+                    var lastEvent = 'left';
+                    
+                    var socket;
+                    
+                    var worms;
+                    
+                    var data;
+                    
+                    var canvasData;
+                    
+                    // username of user
+                    var name;
+                    
+                    var messageQue = [];
+                    
+                    $(window).keydown(function (event) {
+                        // event
+                        var newEvent;
+                        //console.log(event.keyCode);
+                        switch(event.keyCode) {
+                            case 87://38:
+                                newEvent = 'up';
+                                break;
+                            case 83://40:
+                                newEvent = 'down';
+                                break;
+                            case 65://37:
+                                newEvent = 'left';
+                                break;
+                            case 68://39:
+                                newEvent = 'right';
+                                break;
+                        }
+            
+                        if(newEvent === undefined || newEvent === lastEvent) {
+                            return;
+                        }
+            
+                        if((lastEvent == 'up' && newEvent == 'down')
+                            || (lastEvent == 'down' && newEvent == 'up')
+                            || (lastEvent == 'left' && newEvent == 'right')
+                            || (lastEvent == 'right' && newEvent == 'left')
+                    ) {
+                            return;
+                        }
+            
+            
+                        console.log(event, newEvent);
+                        lastEvent = newEvent;
+            
+                        if(socket) {
+                            socket.send(JSON.stringify({
+                                action: 'keypressed',
+                                values: {
+                                    id: current,
+                                    direction: newEvent
+                                }
+                            }));
+                        }
+                        //console.log(newEvent);
+                    });
+        
+                    
+                    var init = function (canvasArray) {
+                    
+                        var i, j, tr, td;
+                        
+                        canvasData = canvasArray;
+                        
+                        maxX = canvasData.length;
+                        maxY = canvasData[0].length;
+                        
+                        elementWidth = canvasWidth/(maxX + 2);
+                        elementHeight = canvasHeight/(maxY + 2);
+                        
+                        lastEvent = 'left';
+                        
+                        draw();
+                    }
+                    
+                    var draw = function () {
+                        var i, j, pos, el, index, color;
+                        //                        $('#canvas td').each(function () {
+                        //                            $(this).css('background', '#ccc');
+                        //                        });
+                        //                      
+                        canvasCtx.fillStyle = '#CCCCCC';
+                        canvasCtx.clearRect(0,0,canvasWidth,canvasHeight);
+                        
+                        for(i = 0; i < (maxX + 2); i++) {
+                            canvasCtx.fillRect(i * elementWidth, 0, elementWidth, elementHeight
+                        );
+                                
+                            canvasCtx.fillRect(i * elementWidth, (maxY + 1) * elementHeight, elementWidth, elementHeight);
+                            
+                        }
+                        
+                        for(i = 0; i < (maxY + 2); i++) {
+                            canvasCtx.fillRect(0, i * elementHeight, elementWidth, elementHeight);
+                                
+                            canvasCtx.fillRect((maxX + 1) * elementWidth, i * elementHeight, elementWidth, elementHeight);
+                            
+                        }
+                        
+                        for(i = 0; i < maxX; i++) {
+                            
+                            for(j = 0; j < maxY; j++) {
+                                if(canvasData[i][j] == 1) {
+                                    canvasCtx.fillRect(
+                                    i * elementWidth + elementWidth,
+                                    j * elementHeight + elementHeight,
+                                    elementWidth,
+                                    elementHeight
+                                );
+                                }
+                            }
+                        }
+                        //console.log(data);
+                        if(!data) {
+                            return;
+                        }
+                        
+                        for(index in data) {
+                            if(data.hasOwnProperty(index)) {
+                                el = data[index];
+                                //console.log(el.pieces);
+                                if(el.id === current) {
+                                    color = '#ff0000';
+                                } else {
+                                    color = worms[el.id].color;
+                                }
+                                //console.log(worms[el.id]);
+                                //console.log(el.pieces);
+                                for(i = 0; i < el.pieces.length; i++) {
+                                    if(i == 0) {
+                                        canvasCtx.fillStyle = '#ffffff';
+                                    } else {
+                                        canvasCtx.fillStyle = color;
+                                    }
+                                    pos = el.pieces[i];
+                                    //$('#'+pos[0]+'-'+pos[1]).css('background', color)
+                                    //if(pos[0] > 1 || pos[1] > 1) {
+                                    //canvasCtx.fillStyle = color;
+                                    canvasCtx.fillRect(pos[0] * elementWidth + elementWidth,pos[1] * elementHeight + elementHeight,elementWidth,elementHeight
+                                );
+                                    //}
+                                }
+                            }
+                        }
+
+                    }
+                    
+                    var step = function (newData) {
+                        if(newData !== undefined) {
+                            data = newData;
+                        }
+                        //console.log(maxX, maxY);
+                        draw();
+                    }
+                    
+                    var setWorms = function (newWorms) {
+                        var i, worm, color, id;
+                        //worms = newWorms;
+                        worms = {};
+                        for(i in newWorms) {
+                            worms[newWorms[i].id] = {
+                                color: newWorms[i].color,
+                                nume: newWorms[i].nume
+                            }
+                        }
+                        
+                        //console.log(worms);
+                        //console.log(worms);
+                        $('#competitors').text('');
+                        for(i in worms) {
+                            worm = worms[i];
+                            //console.log(worm);
+                            if(i == current) {
+                                color = '#ff0000';
+                                //id = 'you';
+                            } else {
+                                color = worm.color;
+                                //id = i;
+                            }
+                            //console.log(worm.color);
+                            var username = worm.nume;
+                            $('#competitors').append($('<p><span style="background: '+color+';">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> - '+username+'</p>'))
+                        }
+                    }
+                    
+                    var addMessage = function (message) {
+                        var i;
+                        messageQue.unshift(message);
+                        if(messageQue.length > 10) {
+                            messageQue.pop();
+                        }
+                        var log = $('#log').text('');
+                        for(i = 0; i < messageQue.length; i++) {
+                            log.append($('<p>'+messageQue[i]+'</p>'))
+                        }
+                    }
+                    
+                    return {
+                        setId: function (id) {
+                            current = id;
+                            //console.log('ID - '+id);
+                        },
+                        init: function (canvasData) {
+                            init(canvasData);
+                        },
+                        step: function (newData) {
+                            step(newData);
+                        },
+                        setSocket: function (newSocket) {
+                            socket = newSocket;
+                            
+                        },
+                        setWorms: function (newWorms) {
+                            setWorms(newWorms);
+                        },
+                        testDie: function (id) {
+                            console.log(id);
+                            if(current == id) {
+                                //alert('ai murit');
+                                //socket.disconnect();
+                            }
+                        },
+                        setName: function (newName) {
+                            name = newName;
+                        },
+                        sendName: function () {
+                            socket.send(JSON.stringify({
+                                id: current,
+                                action: 'name',
+                                nume: name
+                            }));
+                        },
+                        addMessage: function (message) {
+                            addMessage(message);
+                        }
+                    }
+                })();
+                
+                testStart = function () {
+                    var name = $('#inputName').val();
+                    if(name == '') {
+                        return false;
+                    }
+                    Game.setName(name);
+                    
+                    streamConnect();
+                    
+                }
+            });
+            
+        </script>
+
+    </body>
+</html>
